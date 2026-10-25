@@ -315,7 +315,7 @@ footer .btn{width:auto;padding:5px 12px;font-size:12px}
       <h3>🏆 Достижения <span id="achCount2"></span></h3>
       <button id="achClose" class="btn iconBtn" aria-label="Закрыть">✕</button>
     </div>
-    <small class="achNote">Каждое даёт +1% ко всей добыче навсегда и не сгорает при конце света</small>
+    <small class="achNote">Каждое даёт +0,5% ко всей добыче навсегда и не сгорает при конце света</small>
     <div id="achs" class="achList"></div>
   </div>
 </div>
@@ -337,13 +337,13 @@ footer .btn{width:auto;padding:5px 12px;font-size:12px}
 const ERAS = [
   {name:'Кладбище', e:'🪦', need:0, click:'Поднять мертвеца',
    text:''},
-  {name:'Чумная деревня', e:'🐀', need:1e4, click:'Распустить чуму',
+  {name:'Чумная деревня', e:'🐀', need:1e5, click:'Распустить чуму',
    text:'Мертвецов стало больше, чем живых. Деревня твоя.\n\nОткрыт Чумной ритуал: ×7 ко всей добыче на 20 секунд.'},
-  {name:'Королевство Тьмы', e:'🏰', need:1e7, click:'Призвать лича',
-   text:'Король пал и теперь служит тебе.\n\nОткрыта Тёмная энергия: копи её и ставь Тёмные печати, каждая удваивает всю добычу.'},
-  {name:'Апокалипсис', e:'🌋', need:1e10, click:'Открыть врата',
-   text:'Мир горит. Живых больше нет.\n\nОткрыт Конец света: сбрось забег и получи Осколки тьмы. Каждый даёт +10% к добыче навсегда.'},
-  {name:'Мёртвый космос', e:'🌑', need:1e13, click:'Погасить звезду',
+  {name:'Королевство Тьмы', e:'🏰', need:1e9, click:'Призвать лича',
+   text:'Король пал и теперь служит тебе.\n\nОткрыта Тёмная энергия: копи её и ставь Тёмные печати, каждая увеличивает всю добычу в 1,8 раза.'},
+  {name:'Апокалипсис', e:'🌋', need:1e14, click:'Открыть врата',
+   text:'Мир горит. Живых больше нет.\n\nОткрыт Конец света: сбрось забег и получи Осколки тьмы. Каждый даёт +5% к добыче навсегда.'},
+  {name:'Мёртвый космос', e:'🌑', need:1e19, click:'Погасить звезду',
    text:'Земля мертва. Пора приниматься за звёзды.\n\nКаждая Чёрная дыра даёт +1% ко всей добыче. Финальная цель: Тепловая смерть вселенной.'},
 ];
 
@@ -475,10 +475,10 @@ const ACHS = [
 ];
 const achCount = () => Object.keys(S.achs).length;
 
-const WIN_COST = 1e19;
+const WIN_COST = 1e25;
 const RITUAL_MULT = 7, RITUAL_TIME = 20e3, RITUAL_CD = 60e3;
 // Global balance knobs: income multiplier and per-unit price growth of generators.
-const BASE_MULT = 2.5, GROWTH = 1.12;
+const BASE_MULT = 1.8, GROWTH = 1.15;
 const OFFLINE_CAP = 8 * 3600;
 const SAVE_KEY = 'necromancer_save_v1';
 
@@ -546,7 +546,7 @@ function buffMul(key){
 }
 // withTemp = false excludes the ritual and buffs (offline gains, achievements).
 function globalMul(withTemp = true){
-  let m = BASE_MULT * (1 + 0.1 * S.shards) * (1 + 0.01 * achCount()) * 2 ** S.seals;
+  let m = BASE_MULT * (1 + 0.05 * S.shards) * (1 + 0.005 * achCount()) * 1.8 ** S.seals;
   m *= 1 + 0.05 * skillRank('darkwisdom');
   if (S.era >= 4) m *= 1 + 0.01 * cnt('hole');
   for (const h of HYBRIDS) if (S.hybrids[h.id] && h.global) m *= h.global;
@@ -579,8 +579,8 @@ function clickValue(){
 }
 function energyRate(){ return (1 + 0.1 * cnt('lich') + 2 * cnt('necro')) * (S.hybrids.h5 ? 5 : 1); }
 const ritualTime = () => S.hybrids.h3 ? 40e3 : RITUAL_TIME;
-const sealCost = () => 25 * 3 ** S.seals;
-const shardGain = () => Math.floor(Math.cbrt(S.runTotal / 1e10));
+const sealCost = () => 40 * 4 ** S.seals;
+const shardGain = () => Math.floor(Math.cbrt(S.runTotal / 1e12));
 
 // Cost of buying k more of g, geometric series with ratio GROWTH.
 function costOf(g, k){
@@ -1274,7 +1274,7 @@ function render(){
 
   // Mechanics
   $('pShards').classList.toggle('hidden', S.shards <= 0);
-  $('shardsInfo').textContent = `${S.shards} шт. · +${S.shards * 10}% ко всей добыче навсегда`;
+  $('shardsInfo').textContent = `${S.shards} шт. · +${S.shards * 5}% ко всей добыче навсегда`;
 
   $('pRitual').classList.toggle('hidden', S.era < 1);
   $('ritualInfo').textContent = `Вся добыча ×7 на ${ritualTime() / 1000} секунд. Перезарядка ${RITUAL_CD / 1000} секунд.`;
@@ -1284,14 +1284,14 @@ function render(){
   else { rb.textContent = 'Провести ритуал'; rb.disabled = false; }
 
   $('pEnergy').classList.toggle('hidden', S.era < 2);
-  $('energyInfo').textContent = `${fmt(S.energy)} энергии (+${fmt(energyRate())}/с). Печатей: ${S.seals} (добыча ×${fmt(2 ** S.seals)}). Личи и некрополи ускоряют приток.`;
-  $('sealBtn').textContent = `Тёмная печать #${S.seals + 1}: ×2 за ${fmt(sealCost())} энергии`;
+  $('energyInfo').textContent = `${fmt(S.energy)} энергии (+${fmt(energyRate())}/с). Печатей: ${S.seals} (добыча ×${fmt(1.8 ** S.seals)}). Личи и некрополи ускоряют приток.`;
+  $('sealBtn').textContent = `Тёмная печать #${S.seals + 1}: ×1,8 за ${fmt(sealCost())} энергии`;
   $('sealBtn').disabled = S.energy < sealCost();
 
   $('pApoc').classList.toggle('hidden', S.era < 3 && S.prestiges === 0);
   const sg = shardGain();
   $('apocInfo').textContent = `Сбрось забег ради осколков тьмы. Сейчас получишь: ${sg}. Чем больше душ за забег, тем больше осколков.`;
-  $('apocBtn').textContent = sg >= 1 ? `Устроить конец света (+${sg} 💎)` : `Нужно ${fmt(1e10)} душ за забег`;
+  $('apocBtn').textContent = sg >= 1 ? `Устроить конец света (+${sg} 💎)` : `Нужно ${fmt(1e12)} душ за забег`;
   $('apocBtn').disabled = sg < 1;
 
   $('pCosmos').classList.toggle('hidden', S.era < 4);
