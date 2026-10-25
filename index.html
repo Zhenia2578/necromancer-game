@@ -2,7 +2,8 @@
 <html lang="ru">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
 <title>Некромант: от могилы до вселенной</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;800&display=swap" rel="stylesheet">
@@ -55,6 +56,13 @@ main{display:grid;grid-template-columns:360px 1fr;gap:16px}
 .clickLabel{text-align:center;font-family:Cinzel,Georgia,serif;color:var(--text);font-size:14px}
 
 .mech{margin-top:12px;display:flex;flex-direction:column;gap:10px}
+.skillGrid{display:grid;grid-template-columns:1fr;gap:7px;margin-top:8px}
+.skillCard{padding:9px;border:1px solid var(--line);border-radius:8px;background:var(--panel2)}
+.skillTop{display:flex;justify-content:space-between;gap:8px;font-weight:700;font-size:13px}
+.skillCard p{margin:4px 0 7px;color:var(--muted);font-size:12px}
+.skillCard .btn{padding:6px;font-size:12px}
+.xpbar{height:7px;background:var(--bg);border:1px solid var(--line);border-radius:8px;overflow:hidden;margin:7px 0}
+.xpbar i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--accent2),var(--accent))}
 .mp{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:10px}
 .mp h3{font-size:13px;color:var(--accent);margin-bottom:4px}
 .mp p{margin:0 0 8px;color:var(--muted);font-size:12.5px}
@@ -219,6 +227,13 @@ footer .btn{width:auto;padding:5px 12px;font-size:12px}
       <div id="buffs" class="buffs"></div>
 
       <div class="mech">
+        <div id="pCharacter" class="mp">
+          <h3>🧙 Некромант</h3>
+          <p id="charInfo">Уровень 1 · Опыт 0</p>
+          <div class="xpbar"><i id="charXpBar"></i></div>
+          <p id="skillPointsInfo">Очки навыков: 0</p>
+          <div id="skillTree" class="skillGrid"></div>
+        </div>
         <div id="pHunt" class="mp">
           <h3>🪦 Охота на души</h3>
           <p>15 секунд лупи по черепам, которые лезут из могил. 🌟 даёт ×5, а 😇 лучше не трогать.</p>
@@ -472,6 +487,7 @@ function freshState(){
   return {souls:0, runTotal:0, allTime:0, gens:{}, ups:{}, era:0, maxEra:0,
           energy:0, seals:0, ritualEnd:0, ritualReady:0,
           shards:0, prestiges:0, won:false, clicks:0, rituals:0, achs:{},
+          charLevel:1, charXp:0, skillPoints:0, skills:{},
           buffs:[], hybrids:{}, golden:0, events:0, crafts:0, huntReady:0, hunts:0, huntBest:0, started:Date.now(), last:Date.now()};
 }
 let S = freshState();
@@ -479,6 +495,31 @@ let buyMode = 1;
 
 const $ = id => document.getElementById(id);
 const cnt = id => S.gens[id] || 0;
+
+// Character progression: XP comes from clicking and from time spent producing souls.
+const SKILLS = [
+  {id:'soulcraft', e:'🜏', name:'Искусство душ', desc:'Увеличивает производство всех генераторов на 8% за ранг.', max:5, effect:r=>`+${r*8}% к производству`},
+  {id:'gravehand', e:'☠️', name:'Рука могильщика', desc:'Увеличивает силу клика на 20% за ранг.', max:5, effect:r=>`+${r*20}% к клику`},
+  {id:'darkwisdom', e:'📜', name:'Тёмная мудрость', desc:'Даёт +5% к общей добыче за ранг.', max:5, effect:r=>`+${r*5}% ко всей добыче`}
+];
+function xpToNext(){ return 25 + (S.charLevel - 1) * 15; }
+function gainXp(amount){
+  if (!Number.isFinite(amount) || amount <= 0) return;
+  S.charXp += amount;
+  let leveled = false;
+  while (S.charXp >= xpToNext()){
+    S.charXp -= xpToNext();
+    S.charLevel++; S.skillPoints++; leveled = true;
+  }
+  if (leveled && $('charInfo')) toast('⬆️','ПЕРСОНАЖ','Новый уровень!',`Уровень ${S.charLevel}. Получено 1 очко навыка.`);
+}
+function skillRank(id){ return Math.max(0, Number(S.skills?.[id]) || 0); }
+function buySkill(id){
+  const skill = SKILLS.find(x=>x.id===id); if (!skill) return;
+  const rank = skillRank(id);
+  if (rank >= skill.max || S.skillPoints < 1) return SFX.nope();
+  S.skillPoints--; S.skills[id] = rank + 1; SFX.buy(); render(); save();
+}
 
 // ---------- Formatting ----------
 const SUF = ['', 'K', 'M', 'B', 'T', 'Qa', 'Qi', 'Sx', 'Sp', 'Oc', 'No', 'Dc'];
@@ -506,6 +547,7 @@ function buffMul(key){
 // withTemp = false excludes the ritual and buffs (offline gains, achievements).
 function globalMul(withTemp = true){
   let m = BASE_MULT * (1 + 0.1 * S.shards) * (1 + 0.01 * achCount()) * 2 ** S.seals;
+  m *= 1 + 0.05 * skillRank('darkwisdom');
   if (S.era >= 4) m *= 1 + 0.01 * cnt('hole');
   for (const h of HYBRIDS) if (S.hybrids[h.id] && h.global) m *= h.global;
   if (withTemp){
@@ -525,7 +567,7 @@ function genMul(g){
   for (const h of HYBRIDS) if (S.hybrids[h.id] && h.gens && h.gens[g.id]) m *= h.gens[g.id];
   return m;
 }
-function genUnit(g, withRitual = true){ return g.prod * genMul(g) * globalMul(withRitual); }
+function genUnit(g, withRitual = true){ return g.prod * genMul(g) * globalMul(withRitual) * (1 + 0.08 * skillRank('soulcraft')); }
 function sps(withRitual = true){
   return GENS.reduce((a, g) => a + cnt(g.id) * genUnit(g, withRitual), 0);
 }
@@ -533,7 +575,7 @@ function clickValue(){
   let mul = 1, pct = 0;
   for (const u of UPS) if (S.ups[u.id]) { if (u.clickMul) mul *= u.clickMul; if (u.clickPct) pct += u.clickPct; }
   for (const h of HYBRIDS) if (S.hybrids[h.id] && h.click) mul *= h.click;
-  return (mul * globalMul() + pct * sps()) * buffMul('click');
+  return (mul * globalMul() * (1 + 0.2 * skillRank('gravehand')) + pct * sps()) * buffMul('click');
 }
 function energyRate(){ return (1 + 0.1 * cnt('lich') + 2 * cnt('necro')) * (S.hybrids.h5 ? 5 : 1); }
 const ritualTime = () => S.hybrids.h3 ? 40e3 : RITUAL_TIME;
@@ -984,6 +1026,7 @@ function doClick(ev){
   const v = clickValue() * comboMul();
   addSouls(v);
   S.clicks++;
+  gainXp(1);
   SFX.click(combo);
   const r = $('clicker').getBoundingClientRect();
   const x = ev.clientX || r.left + r.width / 2, y = ev.clientY || r.top + r.height / 2;
@@ -1042,7 +1085,8 @@ function apocalypse(){
     onOk(){
       const keep = {shards:S.shards + gain, prestiges:S.prestiges + 1, allTime:S.allTime, maxEra:S.maxEra,
                     won:S.won, clicks:S.clicks, rituals:S.rituals, achs:S.achs, started:S.started,
-                    golden:S.golden, events:S.events, crafts:S.crafts, hunts:S.hunts, huntBest:S.huntBest};
+                    golden:S.golden, events:S.events, crafts:S.crafts, hunts:S.hunts, huntBest:S.huntBest,
+                    charLevel:S.charLevel, charXp:S.charXp, skillPoints:S.skillPoints, skills:S.skills};
       S = Object.assign(freshState(), keep);
       SFX.apoc();
       applyEra();
@@ -1166,6 +1210,25 @@ function renderUps(){
   }
 }
 
+function renderCharacter(){
+  const need = xpToNext();
+  $('charInfo').textContent = `Уровень ${S.charLevel} · Опыт ${Math.floor(S.charXp)} / ${need}`;
+  $('charXpBar').style.width = Math.min(100, S.charXp / need * 100) + '%';
+  $('skillPointsInfo').textContent = `Очки навыков: ${S.skillPoints} · Навыки усиливаются навсегда`;
+  const box = $('skillTree');
+  const key = SKILLS.map(sk=>`${sk.id}:${skillRank(sk.id)}`).join('|') + ':' + S.skillPoints;
+  if (box.dataset.key !== key){
+    box.dataset.key = key; box.innerHTML = '';
+    for (const sk of SKILLS){
+      const rank = skillRank(sk.id);
+      const card = document.createElement('div'); card.className = 'skillCard';
+      card.innerHTML = `<div class="skillTop"><span>${sk.e} ${sk.name}</span><span>${rank}/${sk.max}</span></div><p>${sk.desc}</p><p class="skillEffect">${sk.effect(rank)}</p><button class="btn" ${rank>=sk.max || S.skillPoints<1?'disabled':''}>${rank>=sk.max?'Максимум':`Изучить · 1 очко навыка`}</button>`;
+      card.querySelector('button').onclick = () => buySkill(sk.id);
+      box.appendChild(card);
+    }
+  }
+}
+
 function render(){
   const now = Date.now();
   const rate = sps();
@@ -1205,6 +1268,7 @@ function render(){
       + (sm > 1 ? ` · 🔗 ×${sm.toFixed(2)}` : '');
   }
   renderUps();
+  renderCharacter();
   renderAchs();
   renderRecipes();
 
@@ -1297,16 +1361,90 @@ function fxFrame(t){
   requestAnimationFrame(fxFrame);
 }
 
-// ---------- Save / load ----------
+// ---------- Telegram + Save / load ----------
+const tg = window.Telegram?.WebApp || null;
+const CLOUD_META_KEY = 'necromancer_save_meta_v1';
+const CLOUD_CHUNK_PREFIX = 'necromancer_save_chunk_v1_';
+const CLOUD_CHUNK_SIZE = 3000; // Keep comfortably below Telegram CloudStorage's value limit.
+let cloudSaveQueue = Promise.resolve();
+
+function cloudGet(key){
+  return new Promise((resolve, reject) => {
+    if (!tg?.CloudStorage) return reject(new Error('Telegram CloudStorage unavailable'));
+    try {
+      tg.CloudStorage.getItem(key, (error, value) => error ? reject(error) : resolve(value || ''));
+    } catch (error) { reject(error); }
+  });
+}
+function cloudSet(key, value){
+  return new Promise((resolve, reject) => {
+    if (!tg?.CloudStorage) return reject(new Error('Telegram CloudStorage unavailable'));
+    try {
+      tg.CloudStorage.setItem(key, value, error => error ? reject(error) : resolve());
+    } catch (error) { reject(error); }
+  });
+}
+async function writeCloudSave(json){
+  if (!tg?.CloudStorage || !tg.initData) return;
+  const chunks = [];
+  for (let i = 0; i < json.length; i += CLOUD_CHUNK_SIZE) chunks.push(json.slice(i, i + CLOUD_CHUNK_SIZE));
+  // Write the data first and publish the manifest last, so interrupted saves don't replace a valid save.
+  for (let i = 0; i < chunks.length; i++) await cloudSet(CLOUD_CHUNK_PREFIX + i, chunks[i]);
+  await cloudSet(CLOUD_META_KEY, JSON.stringify({version: 1, chunks: chunks.length, savedAt: Date.now()}));
+}
+async function readCloudSave(){
+  const rawMeta = await cloudGet(CLOUD_META_KEY);
+  if (!rawMeta) return null;
+  const meta = JSON.parse(rawMeta);
+  if (meta.version !== 1 || !Number.isInteger(meta.chunks) || meta.chunks < 1 || meta.chunks > 100) {
+    throw new Error('Invalid cloud save manifest');
+  }
+  let json = '';
+  for (let i = 0; i < meta.chunks; i++) json += await cloudGet(CLOUD_CHUNK_PREFIX + i);
+  return json;
+}
+function applySave(raw){
+  const parsed = JSON.parse(raw);
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error('Invalid save data');
+  S = Object.assign(freshState(), parsed);
+  S.skills = Object.assign({}, freshState().skills, parsed.skills || {});
+}
 function save(){
   S.last = Date.now();
-  try { localStorage.setItem(SAVE_KEY, JSON.stringify(S)); } catch (e) {}
-}
-function load(){
+  let json;
   try {
-    const raw = localStorage.getItem(SAVE_KEY);
-    if (raw) S = Object.assign(freshState(), JSON.parse(raw));
+    json = JSON.stringify(S);
+    localStorage.setItem(SAVE_KEY, json); // Local fallback and quick recovery if Telegram is unavailable.
   } catch (e) {}
+  if (json && tg?.CloudStorage && tg.initData){
+    cloudSaveQueue = cloudSaveQueue.then(() => writeCloudSave(json)).catch(error => {
+      console.warn('Telegram CloudStorage save failed; local save remains available.', error);
+    });
+  }
+}
+async function load(){
+  let localRaw = null;
+  try { localRaw = localStorage.getItem(SAVE_KEY); } catch (e) {}
+
+  // In Telegram, cloud data is authoritative and follows the player across devices.
+  if (tg?.CloudStorage && tg.initData){
+    try {
+      const cloudRaw = await readCloudSave();
+      if (cloudRaw){ applySave(cloudRaw); return; }
+      if (localRaw){
+        applySave(localRaw);
+        // Migrate an existing browser save to Telegram CloudStorage on first launch.
+        await writeCloudSave(JSON.stringify(S));
+        return;
+      }
+      return;
+    } catch (error) {
+      console.warn('Telegram CloudStorage load failed; using local save if available.', error);
+    }
+  }
+  if (localRaw){
+    try { applySave(localRaw); } catch (e) { console.warn('Local save could not be loaded.', e); }
+  }
 }
 
 // ---------- Main loop ----------
@@ -1315,7 +1453,9 @@ function tick(){
   const now = Date.now();
   const dt = Math.min(OFFLINE_CAP, (now - lastTick) / 1000);
   lastTick = now;
-  addSouls(sps() * dt);
+  const production = sps();
+  addSouls(production * dt);
+  if (production > 0) gainXp(dt * 0.08);
   if (S.era >= 2) S.energy += energyRate() * dt;
   S.buffs = S.buffs.filter(b => b.end > now);
   const visible = document.visibilityState === 'visible';
@@ -1333,7 +1473,11 @@ function tick(){
 }
 
 // ---------- Init ----------
-load();
+async function startGame(){
+  if (tg){
+    try { tg.ready(); tg.expand(); } catch (e) {}
+  }
+  await load();
 buildGens();
 buildAchs();
 buildRecipes();
@@ -1375,6 +1519,8 @@ setInterval(tick, 100);
 setInterval(save, 10000);
 render();
 requestAnimationFrame(fxFrame);
+}
+startGame();
 </script>
 </body>
 </html>
