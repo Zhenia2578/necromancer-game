@@ -1,5 +1,6 @@
 import { burst } from '../fx/stage';
 import { isProfane } from '../story/profanity';
+import type { StoryCheckpoint } from '../game/state';
 import { StoryRunner, type Step } from '../story/runner';
 import { SKULL_NAMES } from '../story/skullNames';
 import { el, wait } from './dom';
@@ -32,8 +33,19 @@ function shuffle<T>(items: T[]): T[] {
   return a;
 }
 
+export interface PlayOptions {
+  /** Resume from a checkpoint saved by a previous session. */
+  resume?: StoryCheckpoint | null;
+  /** Called before every step with a state that replays that step when resumed. */
+  onCheckpoint?: (checkpoint: StoryCheckpoint) => void;
+}
+
 /** Plays an ink story as a visual-novel dialogue and resolves when it ends. */
-export async function playStory(root: HTMLElement, runner: StoryRunner): Promise<StoryOutcome> {
+export async function playStory(
+  root: HTMLElement,
+  runner: StoryRunner,
+  { resume, onCheckpoint }: PlayOptions = {},
+): Promise<StoryOutcome> {
   root.replaceChildren();
   const view = el('div', 'dlg');
   const stage = el('div', 'dlg-stage');
@@ -206,7 +218,13 @@ export async function playStory(root: HTMLElement, runner: StoryRunner): Promise
   const unlocks: string[] = [];
   const quests: string[] = [];
 
+  if (resume) {
+    runner.loadState(resume.ink);
+    if (resume.scene) document.body.dataset.scene = resume.scene;
+  }
+
   for (;;) {
+    onCheckpoint?.({ ink: runner.saveState(), scene: document.body.dataset.scene ?? null });
     const step = runner.next();
     if (step.type === 'end') break;
     if (step.type === 'choices') {

@@ -49,4 +49,12 @@ export class StoryRunner {
   set(name: string, value: string | number | boolean): void {
     this.story.variablesState.$(name, value);
   }
+
+  saveState(): string {
+    return this.story.state.ToJson();
+  }
+
+  loadState(json: string): void {
+    this.story.state.LoadJson(json);
+  }
 }
