@@ -1,0 +1,257 @@
+:root {
+  --bg: #0b120e;
+  --panel: rgba(14, 22, 17, 0.92);
+  --line: #2a4031;
+  --text: #d8e6dc;
+  --muted: #7d9585;
+  --accent: #6dff9e;
+  --fire: #ff9a4d;
+  --nameless: #c7b8ff;
+  --skull: #9dffbf;
+  --inquisitor: #ffcf7a;
+  --error: #ff8a8a;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font-family: system-ui, -apple-system, sans-serif;
+  overflow: hidden;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Scene backdrops, switched by `# scene:<id>` tags. Placeholders until real art. */
+body { transition: background 1.2s ease; }
+body[data-scene='pyre'] { background: radial-gradient(ellipse at 50% 85%, #6b2a0c 0%, #2a0f06 45%, #0b0604 100%); }
+body[data-scene='void'] { background: #000; }
+body[data-scene='mass_grave'] { background: radial-gradient(ellipse at 50% 30%, #1d2b22 0%, #0b120e 70%); }
+body[data-scene='mass_grave_skull'] { background: radial-gradient(ellipse at 50% 45%, #1f3a29 0%, #0b120e 70%); }
+body[data-scene='grave_ending'] { background: radial-gradient(ellipse at 50% 50%, #1a1a1a 0%, #050505 80%); }
+
+#fx {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 0;
+}
+
+#ui {
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  padding-bottom: max(16px, env(safe-area-inset-bottom));
+}
+
+button { font: inherit; color: inherit; }
+
+/* ---------- Dialogue ---------- */
+
+.dlg {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  padding: 16px;
+  padding-bottom: max(16px, env(safe-area-inset-bottom));
+  cursor: pointer;
+}
+
+.dlg-stage {
+  flex: 1;
+  display: grid;
+  place-items: center;
+}
+
+.dlg-box {
+  width: 100%;
+  max-width: 640px;
+  margin: 0 auto;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 14px 16px 12px;
+  min-height: 120px;
+  position: relative;
+  backdrop-filter: blur(6px);
+}
+
+.dlg-speaker {
+  font-family: 'Cinzel', serif;
+  font-weight: 600;
+  font-size: 14px;
+  letter-spacing: 0.04em;
+  margin-bottom: 6px;
+  color: var(--accent);
+}
+.dlg-box[data-speaker='inquisitor'] .dlg-speaker { color: var(--inquisitor); }
+.dlg-box[data-speaker='crowd'] .dlg-speaker { color: var(--fire); }
+.dlg-box[data-speaker='nameless'] .dlg-speaker { color: var(--nameless); }
+.dlg-box[data-speaker='skull'] .dlg-speaker { color: var(--skull); }
+.dlg-box[data-speaker='hero'] .dlg-speaker { color: var(--text); }
+.dlg-box[data-speaker='nameless'] .dlg-text { color: #e4dcff; font-style: italic; }
+
+.dlg-text {
+  font-size: 17px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+}
+.dlg-text.narration { color: var(--muted); font-style: italic; }
+
+.dlg-hint {
+  position: absolute;
+  right: 14px;
+  bottom: 8px;
+  font-size: 12px;
+  color: var(--muted);
+  animation: bob 1.2s ease-in-out infinite;
+}
+
+@keyframes bob {
+  50% { transform: translateY(3px); }
+}
+
+.dlg-actions:not(:empty) {
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  cursor: default;
+}
+
+.dlg-choice {
+  width: 100%;
+  text-align: left;
+  background: rgba(109, 255, 158, 0.06);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 11px 14px;
+  font-size: 15px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.dlg-choice:hover,
+.dlg-choice:focus-visible { background: rgba(109, 255, 158, 0.14); border-color: var(--accent); outline: none; }
+.dlg-choice:active { transform: scale(0.99); }
+.dlg-choice.secondary { text-align: center; color: var(--muted); }
+
+.dlg-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+.dlg-grid .dlg-choice { text-align: center; font-size: 14px; }
+
+.dlg-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.dlg-form {
+  display: flex;
+  gap: 8px;
+}
+.dlg-form .dlg-choice { width: auto; flex: none; }
+
+.dlg-input {
+  flex: 1;
+  min-width: 0;
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 11px 14px;
+  font: inherit;
+  font-size: 16px; /* 16px prevents iOS zoom on focus */
+  color: var(--text);
+  -webkit-user-select: text;
+  user-select: text;
+}
+.dlg-input:focus { outline: none; border-color: var(--accent); }
+
+.dlg-error {
+  color: var(--error);
+  font-size: 14px;
+  min-height: 1em;
+}
+.dlg-error:empty { display: none; }
+
+/* ---------- Tutorial corpse ---------- */
+
+.corpse {
+  background: none;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+}
+
+.corpse-body {
+  font-size: 72px;
+  display: inline-block;
+  transform: rotate(90deg);
+  filter: grayscale(1) brightness(0.7) drop-shadow(0 0 14px rgba(109, 255, 158, 0.55));
+  animation: pulse 1.6s ease-in-out infinite;
+  transition: transform 0.6s ease, filter 0.6s ease;
+}
+
+.corpse-label {
+  color: var(--accent);
+  font-size: 14px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.corpse.risen .corpse-body {
+  transform: rotate(0deg);
+  filter: grayscale(0.6) hue-rotate(80deg) drop-shadow(0 0 22px rgba(109, 255, 158, 0.9));
+  animation: none;
+}
+.corpse.risen .corpse-label { visibility: hidden; }
+
+@keyframes pulse {
+  50% { filter: grayscale(1) brightness(0.85) drop-shadow(0 0 26px rgba(109, 255, 158, 0.85)); }
+}
+
+/* ---------- Cards (ending, placeholders) ---------- */
+
+.card {
+  width: 100%;
+  max-width: 420px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 24px 20px;
+  text-align: center;
+}
+
+.card-kicker {
+  color: var(--muted);
+  font-size: 12px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.card-title {
+  font-family: 'Cinzel', serif;
+  font-size: 28px;
+  margin: 8px 0 12px;
+  color: var(--accent);
+}
+
+.card-text { line-height: 1.45; margin: 0 0 16px; }
+.card-muted { color: var(--muted); font-size: 14px; margin: 0; }
+.card .dlg-choice { text-align: center; }
